@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wetter-Direkt24 | Professional Weather Console</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet.js for Interactive Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              800: '#075985',
+              900: '#0c4a6e',
+            },
+            ard: {
+              sea: '#003399',
+              land: '#4d8a2f',
+              temp: '#e69500'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+
+    /* Tab System */
+    .tab-button {
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-bottom: 2px solid transparent;
+      padding-bottom: 4px;
+    }
+
+    .tab-button.active {
+      color: white !important;
+      border-bottom-color: #fbbf24;
+    }
+
+    .tab-button:not(.active) {
+      color: #bfdbfe;
+    }
+
+    .tab-button:not(.active):hover {
+      color: #e0f2fe;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Weather Options */
+    .weather-option input:checked+div+span {
+      font-weight: 900;
+    }
+
+    .weather-option:has(input:checked) {
+      border-color: #fbbf24 !important;
+      background-color: #fef3c7 !important;
+      box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+    }
+
+    /* Responsive Heights */
+    #weather-map {
+      height: 350px;
+      width: 100%;
+      border-radius: 8px;
+      z-index: 1;
+    }
+
+    #wish-map {
+      height: 300px;
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    @media (min-width: 1024px) {
+      #weather-map {
+        height: 600px;
+      }
+
+      #wish-map {
+        height: 400px;
+      }
+    }
+
+    body {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .map-container {
+      position: relative;
+      background-color: #e5e7eb;
+    }
+
+    /* Custom Leaflet Markers */
+    .weather-marker {
+      background: white;
+      border-radius: 50%;
+      padding: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+      transition: transform 0.2s ease;
+      cursor: pointer;
+      min-width: 70px;
+    }
+
+    .weather-marker:hover {
+      transform: scale(1.15);
+      z-index: 1000 !important;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .weather-marker-temp {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .weather-marker-icon {
+      font-size: 24px;
+      margin-bottom: 2px;
+    }
+
+    .weather-marker-city {
+      font-size: 10px;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+    }
+
+    /* Temperature Color Coding */
+    .temp-freezing {
+      color: #3b82f6;
+    }
+
+    /* Blue < 0°C */
+    .temp-cold {
+      color: #10b981;
+    }
+
+    /* Green 0-15°C */
+    .temp-warm {
+      color: #f59e0b;
+    }
+
+    /* Orange 15-25°C */
+    .temp-hot {
+      color: #ef4444;
+    }
+
+    /* Red > 25°C */
+
+    /* LIVE Karte Badge on Map */
+    .live-map-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e293b;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #ef4444;
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .map-pin:hover .map-badge {
+      transform: scale(1.1);
+    }
+
+    /* Animation Overlay */
+    #animation-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+      display: none;
+    }
+
+    /* SUN */
+    .sun-animation {
+      background: radial-gradient(circle at 50% 50%, rgba(255, 200, 0, 0.4) 0%, transparent 70%);
+      animation: sunPulse 4s infinite alternate;
+    }
+
+    @keyframes sunPulse {
+      0% {
+        opacity: 0.5;
+        transform: scale(0.8);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1.2);
+      }
+    }
+
+    /* SNOW */
+    .snowflake {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      opacity: 0.9;
+      animation: snowfall linear infinite;
+    }
+
+    @keyframes snowfall {
+      to {
+        transform: translateY(100vh);
+      }
+    }
+
+    /* RAIN */
+    .raindrop {
+      position: absolute;
+      width: 2px;
+      height: 20px;
+      background: rgba(200, 220, 255, 0.8);
+      animation: rainfall 0.6s linear infinite;
+    }
+
+    @keyframes rainfall {
+      to {
+        transform: translateY(100vh);
+      }
+    }
+
+    /* STORM */
+    .storm-flash {
+      background: white;
+      opacity: 0;
+      animation: flash 3s infinite;
+    }
+
+    @keyframes flash {
+
+      0%,
+      90%,
+      100% {
+        opacity: 0;
+      }
+
+      92% {
+        opacity: 0.6;
+      }
+
+      93% {
+        opacity: 0;
+      }
+
+      94% {
+        opacity: 0.3;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col relative">
+
+  <!-- Animation Layer -->
+  <div id="animation-overlay"></div>
+
+  <!-- Navbar -->
+  <nav class="bg-[#003399] text-white shadow-lg sticky top-0 z-50">
+    <div
+      class="container mx-auto px-2 md:px-4 py-3 md:h-16 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0">
+      <div class="flex items-center space-x-2">
+        <!-- TV Weather Cloud Icon -->
+        <svg class="w-6 h-6 md:w-8 md:h-8 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17 19a5 5 0 003.5-9 6 6 0 00-11 0 4 4 0 10.5 8.5L17 19z" />
+        </svg>
+        <h1 class="text-base md:text-xl font-bold tracking-tight">WETTER<span class="text-yellow-400">SCHAU</span></h1>
+      </div>
+
+      <div class="flex space-x-6 md:space-x-8 text-xs md:text-sm font-bold uppercase tracking-wider">
+        <button data-tab="live-karte" class="tab-button active">Live-Karte</button>
+        <button data-tab="wunsch-wetter" class="tab-button">Wunsch-Wetter</button>
+      </div>
+
+      <form action="" method="GET" class="w-full md:w-auto relative group"
+        onsubmit="event.preventDefault(); window.app.searchCity(event);">
+        <input type="text" name="city" id="city-search" placeholder="Ort eingeben..."
+          class="bg-[#002266] text-sm text-white placeholder-blue-300 rounded shadow-inner pl-4 pr-10 py-1.5 focus:outline-none focus:ring-1 focus:ring-yellow-400 transition-all w-full md:w-48 md:group-hover:w-64 md:focus:w-64">
+        <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 text-blue-300 hover:text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </nav>
+
+
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-2 md:px-4 py-4 md:py-8 flex-grow">
+
+    <!-- Error / Loading State -->
+    <div id="status-message" class="hidden mb-6 p-4 rounded-lg text-center"></div>
+
+    <!-- TAB 1: Live-Karte (Active by default) -->
+    <div id="live-karte" class="tab-content active px-2 md:px-0">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Column 1 & 2 on Desktop, Row 1 on Mobile: Map & Forecast -->
+        <div class="lg:col-span-2 space-y-6">
+
+          <!-- Map Section (Leaflet Interactive Map) -->
+          <div class="bg-white rounded shadow-md border border-slate-300 overflow-hidden relative map-container">
+            <!-- LIVE KARTE Badge -->
+            <div class="live-map-badge">
+              <span class="live-dot"></span>
+              LIVE KARTE
+            </div>
+
+            <!-- Leaflet Map Container -->
+            <div id="weather-map"></div>
+          </div>
+
+          <!-- 5-Day Forecast -->
+          <div>
+            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2 border-b border-slate-300 pb-2">
+              Die
+              Aussichten</h3>
+            <div id="forecast-container" class="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <!-- Forecast items injected here -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Current Weather -->
+        <div class="lg:col-span-1">
+          <div class="bg-white rounded shadow-md border border-slate-300 overflow-hidden sticky top-24">
+
+            <!-- Header -->
+            <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+              <div>
+                <h2 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Details für
+                </h2>
+                <div class="flex items-baseline gap-2">
+                  <h3 id="city-display" class="text-xl md:text-2xl font-bold text-slate-800">Lädt...</h3>
+                </div>
+                <div id="display-date" class="text-[10px] md:text-xs text-blue-600 font-bold mt-1">Aktuell</div>
+              </div>
+
+              <!-- Status Dot -->
+              <div class="w-3 h-3 bg-green-500 rounded-full shadow-sm"></div>
+            </div>
+
+            <!-- Main Temp -->
+            <div
+              class="p-6 md:p-8 flex flex-col items-center justify-center text-center bg-gradient-to-br from-blue-50 to-white">
+              <div id="weather-icon-lg" class="text-6xl md:text-7xl mb-4 drop-shadow-md">
+                <!-- Icon -->
+              </div>
+              <div class="flex items-start justify-center">
+                <span id="current-temp" class="text-5xl md:text-6xl font-bold text-slate-800">--</span>
+                <span class="text-2xl md:text-3xl text-slate-500 mt-2">°</span>
+              </div>
+              <p id="weather-desc" class="text-slate-600 font-medium mt-2 text-base md:text-lg">--</p>
+            </div>
+
+            <!-- Details Grid -->
+            <div class="grid grid-cols-2 border-t border-slate-200 text-sm bg-slate-50">
+              <div class="p-4 border-r border-slate-200 flex flex-col items-center justify-center">
+                <span class="text-slate-500 text-xs uppercase font-bold mb-1">Wind</span>
+                <span id="wind-speed" class="font-bold text-slate-700 text-lg">--</span>
+                <span class="text-[10px] text-slate-400">km/h</span>
+              </div>
+              <div class="p-4 flex flex-col items-center justify-center">
+                <span class="text-slate-500 text-xs uppercase font-bold mb-1">Niederschlag</span>
+                <span id="precip-prob" class="font-bold text-slate-700 text-lg">--</span>
+                <span class="text-[10px] text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="wish-badge"
+            class="hidden mt-4 bg-yellow-100 text-yellow-800 text-center text-sm font-bold py-3 px-4 rounded shadow border border-yellow-300 uppercase tracking-wide">
+            ✨ WUNSCH ERFÜLLT ✨
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TAB 2: Wunsch-Wetter -->
+    <div id="wunsch-wetter" class="tab-content px-2 md:px-0">
+      <div class="max-w-5xl mx-auto">
+        <div class="bg-white rounded-lg shadow-md border border-slate-300 p-4 md:p-8">
+          <h2 class="text-xl md:text-3xl font-bold text-slate-800 mb-2 flex items-center gap-3">
+            <svg class="w-8 h-8 md:w-10 md:h-10 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z">
+              </path>
+            </svg>
+            Wetter-Wunschmaschine 3000™
+          </h2>
+
+          <p class="text-slate-600 mb-8 text-base md:text-lg">
+            Dein Wetter
+          </p>
+
+          <form id="wish-form-tab" class="space-y-8">
+            <!-- Location & Date -->
+            <div class="grid md:grid-cols-2 gap-6">
+              <div>
+                <label class="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Ort</label>
+                <input type="text" id="wish-city-tab"
+                  class="w-full border-2 border-slate-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#003399] focus:border-[#003399] transition-all"
+                  placeholder="z.B. Berlin, Hamburg, München...">
+              </div>
+              <div>
+                <label class="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Datum</label>
+                <input type="date" id="wish-date-tab"
+                  class="w-full border-2 border-slate-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#003399] focus:border-[#003399] transition-all">
+              </div>
+            </div>
+
+            <!-- Weather Categories -->
+            <div>
+              <label class="block text-sm font-bold text-slate-700 mb-4 uppercase tracking-wide">Wetter-Option
+                auswählen</label>
+
+              <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Sonnenbad -->
+                <label
+                  class="weather-option relative flex flex-col items-center p-5 border-2 border-slate-100 rounded-xl cursor-pointer hover:border-[#003399] hover:bg-slate-50 transition-all group shadow-sm">
+                  <input type="radio" name="wish-type-tab" value="sonnenbad" class="hidden" checked>
+                  <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">☀️</div>
+                  <span class="font-bold text-slate-800">Sonnenbad</span>
+                  <span class="text-[10px] text-slate-500 mt-1">30°C</span>
+                </label>
+
+                <!-- Grillparty -->
+                <label
+                  class="weather-option relative flex flex-col items-center p-5 border-2 border-slate-100 rounded-xl cursor-pointer hover:border-[#003399] hover:bg-slate-50 transition-all group shadow-sm">
+                  <input type="radio" name="wish-type-tab" value="grill" class="hidden">
+                  <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">🌤️</div>
+                  <span class="font-bold text-slate-800">Grillparty</span>
+                  <span class="text-[10px] text-slate-500 mt-1">25°C</span>
+                </label>
+
+                <!-- Netflix & Chill -->
+                <label
+                  class="weather-option relative flex flex-col items-center p-5 border-2 border-slate-100 rounded-xl cursor-pointer hover:border-[#003399] hover:bg-slate-50 transition-all group shadow-sm">
+                  <input type="radio" name="wish-type-tab" value="netflix" class="hidden">
+                  <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">🌧️</div>
+                  <span class="font-bold text-slate-800 text-center leading-tight">Netflix & Chill</span>
+                  <span class="text-[10px] text-slate-500 mt-1">15°C</span>
+                </label>
+
+                <!-- Weltuntergang -->
+                <label
+                  class="weather-option relative flex flex-col items-center p-5 border-2 border-slate-100 rounded-xl cursor-pointer hover:border-[#003399] hover:bg-slate-50 transition-all group shadow-sm">
+                  <input type="radio" name="wish-type-tab" value="weltuntergang" class="hidden">
+                  <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">⛈️</div>
+                  <span class="font-bold text-slate-800">Weltuntergang</span>
+                  <span class="text-[10px] text-slate-500 mt-1">19°C</span>
+                </label>
+
+                <!-- Romantik -->
+                <label
+                  class="weather-option relative flex flex-col items-center p-5 border-2 border-slate-100 rounded-xl cursor-pointer hover:border-[#003399] hover:bg-slate-50 transition-all group shadow-sm">
+                  <input type="radio" name="wish-type-tab" value="romantik" class="hidden">
+                  <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">🌅</div>
+                  <span class="font-bold text-slate-800">Romantik</span>
+                  <span class="text-[10px] text-slate-500 mt-1">22°C</span>
+                </label>
+
+                <!-- Skifahren -->
+                <label
+                  class="weather-option relative flex flex-col items-center p-5 border-2 border-slate-100 rounded-xl cursor-pointer hover:border-[#003399] hover:bg-slate-50 transition-all group shadow-sm">
+                  <input type="radio" name="wish-type-tab" value="skifahren" class="hidden">
+                  <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">❄️</div>
+                  <span class="font-bold text-slate-800">Skifahren</span>
+                  <span class="text-[10px] text-slate-500 mt-1">-3°C</span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit"
+              class="w-full bg-[#003399] hover:bg-[#002266] text-white font-bold py-5 px-6 rounded-lg shadow-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] uppercase tracking-widest text-lg flex items-center justify-center gap-3">
+              Wetter erstellen
+            </button>
+          </form>
+
+          <!-- Expanded Result Display -->
+          <div id="wish-result" class="hidden mt-12 space-y-6">
+            <!-- Status Header -->
+            <div class="bg-green-600 text-white p-4 rounded-lg shadow-md text-center font-bold animate-pulse">
+              ✅ Wetter erfolgreich erstellt!
+            </div>
+
+            <!-- Interaktive Karte -->
+            <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden relative"
+              style="height: 400px;">
+              <div id="wish-map" class="w-full h-full"></div>
+            </div>
+
+            <!-- Wetter-Details Header -->
+            <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+              <div class="bg-[#003399] text-white p-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-6">
+                  <div id="wish-result-icon" class="text-7xl">☀️</div>
+                  <div>
+                    <div class="text-5xl font-bold"><span id="wish-result-temp">30</span>°C</div>
+                    <div id="wish-result-title" class="text-xl font-medium opacity-90">Sonnenbad-Wetter</div>
+                  </div>
+                </div>
+                <div class="text-center md:text-right">
+                  <h3 id="wish-result-city" class="text-2xl font-bold uppercase tracking-tight">Berlin</h3>
+                  <p id="wish-result-date" class="text-sm opacity-80">Sonntag, 15. Februar 2026</p>
+                </div>
+              </div>
+
+              <!-- Wetter-Beschreibung -->
+              <div class="p-6 border-b border-slate-100 bg-slate-50">
+                <p id="wish-result-desc" class="text-slate-700 text-lg font-medium text-center italic">
+                  Sonniges Wetter mit hohen Temperaturen
+                </p>
+              </div>
+
+              <!-- Details Grid -->
+              <div class="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 bg-white">
+                <!-- Spalte 1: Temp & Wind -->
+                <div class="space-y-6">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl">🌡️</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Gefühlt
+                      </div>
+                      <div class="text-lg font-bold text-slate-800"><span id="detail-feels-like">32</span>°C</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl">💨</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Wind
+                      </div>
+                      <div class="text-lg font-bold text-slate-800"><span id="detail-wind">8</span> km/h <span
+                          class="text-sm text-slate-400 font-normal ml-1" id="detail-wind-dir">SW</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Spalte 2: Luft -->
+                <div class="space-y-6">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl">💧</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">
+                        Feuchtigkeit</div>
+                      <div class="text-lg font-bold text-slate-800"><span id="detail-humidity">45</span>%</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl">⏲️</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">
+                        Luftdruck</div>
+                      <div class="text-lg font-bold text-slate-800"><span id="detail-pressure">1018</span> hPa</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Spalte 3: Details -->
+                <div class="space-y-6">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl">👁️</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">
+                        Sichtweite</div>
+                      <div class="text-lg font-bold text-slate-800"><span id="detail-visibility">25</span> km</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl">🔆</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">UV-Index
+                      </div>
+                      <div class="text-lg font-bold text-slate-800"><span id="detail-uv">8</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Spalte 4: Sonne -->
+                <div class="space-y-6">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl">🌅</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Aufgang
+                      </div>
+                      <div class="text-lg font-bold text-slate-800" id="detail-sunrise">07:34</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl">🌇</div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">
+                        Untergang</div>
+                      <div class="text-lg font-bold text-slate-800" id="detail-sunset">17:28</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Share-Box -->
+            <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
+              <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-[#003399]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6a3 3 0 100-2.684m0 2.684l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                Teilen Sie Ihr Wunsch-Wetter
+              </h3>
+              <div class="flex flex-col md:flex-row gap-3">
+                <input type="text" id="share-link-input" readonly
+                  class="flex-grow bg-slate-50 border-2 border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-600 focus:outline-none focus:border-[#003399] transition-all"
+                  value="">
+                <button id="copy-link-btn"
+                  class="bg-[#003399] hover:bg-[#002266] text-white font-bold py-3 px-6 rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap min-w-[160px]">
+                  <span>Link kopieren</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div>
+    </div>
+    </div>
+
+
+
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 mt-auto py-6">
+    <div class="container mx-auto px-4 text-center text-xs text-slate-400">
+      &copy; 2026 WetterSchau. Ein Service Ihrer persönlichen Wetter-KI.
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    class WeatherApp {
+      constructor() {
+        this.elements = {
+          cityDisplay: document.getElementById('city-display'),
+          displayDate: document.getElementById('display-date'),
+          currentTemp: document.getElementById('current-temp'),
+          weatherIconLg: document.getElementById('weather-icon-lg'),
+          weatherDesc: document.getElementById('weather-desc'),
+          windSpeed: document.getElementById('wind-speed'),
+          precipProb: document.getElementById('precip-prob'),
+          forecastContainer: document.getElementById('forecast-container'),
+          statusMessage: document.getElementById('status-message'),
+          overlay: document.getElementById('animation-overlay'),
+          wishBadge: document.getElementById('wish-badge'),
+          shareLinkInput: document.getElementById('share-link-input'),
+          copyLinkBtn: document.getElementById('copy-link-btn')
+        };
+
+        this.weatherCodes = {
+          // Clear & Cloudy
+          0: { label: 'Klar', icon: '☀️' },
+          1: { label: 'Meist klar', icon: '🌤️' },
+          2: { label: 'Teilweise bewölkt', icon: '⛅' },
+          3: { label: 'Bedeckt', icon: '☁️' },
+
+          // Fog
+          45: { label: 'Nebel', icon: '🌫️' },
+          48: { label: 'Nebel', icon: '🌫️' },
+
+          // Drizzle
+          51: { label: 'Leichter Nieselregen', icon: '�️' },
+          53: { label: 'Nieselregen', icon: '🌦️' },
+          55: { label: 'Starker Nieselregen', icon: '�🌧️' },
+          56: { label: 'Gefrierender Nieselregen', icon: '🌧️' },
+          57: { label: 'Starker gefrierender Nieselregen', icon: '🌧️' },
+
+          // Rain
+          61: { label: 'Leichter Regen', icon: '�️' },
+          63: { label: 'Regen', icon: '🌧️' },
+          65: { label: 'Starker Regen', icon: '🌧️' },
+          66: { label: 'Gefrierender Regen', icon: '🌧️' },
+          67: { label: 'Starker gefrierender Regen', icon: '🌧️' },
+
+          // Snow
+          71: { label: 'Leichter Schneefall', icon: '🌨️' },
+          73: { label: 'Schneefall', icon: '🌨️' },
+          75: { label: 'Starker Schneefall', icon: '❄️' },
+          77: { label: 'Schneegriesel', icon: '🌨️' },
+
+          // Rain showers
+          80: { label: 'Leichte Regenschauer', icon: '🌦️' },
+          81: { label: 'Regenschauer', icon: '🌧️' },
+          82: { label: 'Starke Regenschauer', icon: '⛈️' },
+
+          // Snow showers
+          85: { label: 'Leichte Schneeschauer', icon: '🌨️' },
+          86: { label: 'Schneeschauer', icon: '❄️' },
+
+          // Thunderstorm
+          95: { label: 'Gewitter', icon: '⛈️' },
+          96: { label: 'Gewitter mit Hagel', icon: '⛈️' },
+          99: { label: 'Gewitter mit Starkhagel', icon: '⛈️' }
+        };
+
+        // Professionelle Wunsch-Wetter Kategorien
+        this.wishWeatherTypes = {
+          sonnenbad: {
+            temp: 30,
+            icon: '☀️',
+            title: 'Sonniges Wetter',
+            desc: 'Sonniges Wetter mit hohen Temperaturen und klarem Himmel.',
+            animation: 'sun',
+            wind: [5, 10], humidity: [40, 50], pressure: [1015, 1020], visibility: 30, uv: 9
+          },
+          grill: {
+            temp: 25,
+            icon: '🌤️',
+            title: 'Heiteres Wetter',
+            desc: 'Milde Temperaturen mit leichtem Wind und heiterem Himmel.',
+            animation: 'sun',
+            wind: [8, 15], humidity: [45, 55], pressure: [1013, 1018], visibility: 25, uv: 6
+          },
+          netflix: {
+            temp: 15,
+            icon: '🌧️',
+            title: 'Regnerisches Wetter',
+            desc: 'Kühle Temperaturen mit moderatem Regenfall.',
+            animation: 'rain',
+            wind: [10, 20], humidity: [80, 95], pressure: [1005, 1012], visibility: 8, uv: 2
+          },
+          weltuntergang: {
+            temp: 19,
+            icon: '⛈️',
+            title: 'Stürmisches Gewitter',
+            desc: 'Dramatisches Gewitter mit starken Windböen und Blitzen.',
+            animation: 'storm',
+            wind: [40, 65], humidity: [85, 100], pressure: [990, 1005], visibility: 5, uv: 3
+          },
+          romantik: {
+            temp: 22,
+            icon: '🌅',
+            title: 'Abendrot-Atmosphäre',
+            desc: 'Angenehme Temperaturen mit klarer Sicht zum Sonnenuntergang.',
+            animation: 'sun',
+            wind: [5, 12], humidity: [50, 60], pressure: [1014, 1019], visibility: 35, uv: 4
+          },
+          skifahren: {
+            temp: -3,
+            icon: '❄️',
+            title: 'Winterliches Ski-Wetter',
+            desc: 'Kaltes Wetter mit optimalen Bedingungen für den Wintersport.',
+            animation: 'snow',
+            wind: [5, 15], humidity: [30, 45], pressure: [1018, 1025], visibility: 40, uv: 8
+          }
+        };
+
+        this.init();
+      }
+
+      init() {
+        this.setupTabs();
+        this.loadFromUrlParams();
+
+        // Wunsch-Wetter Form
+        const wishFormTab = document.getElementById('wish-form-tab');
+        if (wishFormTab) {
+          wishFormTab.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleWishTabSubmit();
+          });
+        }
+
+        // Selection Visuals
+        const weatherOptions = document.querySelectorAll('.weather-option');
+        weatherOptions.forEach(option => {
+          option.addEventListener('click', function () {
+            weatherOptions.forEach(opt => opt.classList.remove('border-[#003399]', 'bg-slate-50'));
+            this.classList.add('border-[#003399]', 'bg-slate-50');
+            const radio = this.querySelector('input[type="radio"]');
+            if (radio) radio.checked = true;
+          });
+        });
+
+        // Copy Button
+        if (this.elements.copyLinkBtn) {
+          this.elements.copyLinkBtn.addEventListener('click', () => {
+            this.copyToClipboard(this.elements.shareLinkInput.value);
+          });
+        }
+
+        this.loadMapData();
+      }
+
+      loadFromUrlParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const shareWetter = urlParams.get('wetter');
+        const shareCity = urlParams.get('city');
+        const shareDate = urlParams.get('date');
+
+        if (shareWetter) {
+          // Switch Tab
+          const wunschWetterTab = document.querySelector('[data-tab="wunsch-wetter"]');
+          if (wunschWetterTab) wunschWetterTab.click();
+
+          // Fill Inputs
+          const cityInput = document.getElementById('wish-city-tab');
+          const dateInput = document.getElementById('wish-date-tab');
+          if (cityInput && shareCity) cityInput.value = shareCity;
+          if (dateInput && shareDate) dateInput.value = shareDate;
+
+          // Select Option
+          const radio = document.querySelector(`input[name="wish-type-tab"][value="${shareWetter}"]`);
+          if (radio) {
+            radio.checked = true;
+            const option = radio.closest('.weather-option');
+            if (option) {
+              const options = document.querySelectorAll('.weather-option');
+              options.forEach(opt => opt.classList.remove('border-[#003399]', 'bg-slate-50'));
+              option.classList.add('border-[#003399]', 'bg-slate-50');
+            }
+          }
+
+          // Trigger Result
+          this.displayWishResult(shareCity || 'Berlin', shareDate || new Date().toISOString().split('T')[0], shareWetter);
+        } else {
+          const city = urlParams.get('city') || 'Berlin';
+          this.fetchData(city);
+        }
+      }
+
+      setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            button.classList.add('active');
+            const targetContent = document.getElementById(targetTab);
+            if (targetContent) targetContent.classList.add('active');
+          });
+        });
+      }
+
+      searchCity(event) {
+        event.preventDefault();
+        const cityInput = document.getElementById('city-search');
+        if (cityInput && cityInput.value) {
+          this.fetchData(cityInput.value);
+          const liveKarteTab = document.querySelector('[data-tab="live-karte"]');
+          if (liveKarteTab) liveKarteTab.click();
+        }
+      }
+
+      handleWishTabSubmit() {
+        const cityInput = document.getElementById('wish-city-tab');
+        const dateInput = document.getElementById('wish-date-tab');
+        const typeInputs = document.getElementsByName('wish-type-tab');
+
+        let weatherType = 'sonnenbad';
+        typeInputs.forEach(input => {
+          if (input.checked) weatherType = input.value;
+        });
+
+        this.displayWishResult(cityInput.value || 'Berlin', dateInput.value || new Date().toISOString().split('T')[0], weatherType);
+      }
+
+      async displayWishResult(city, date, weatherType) {
+        const weather = this.wishWeatherTypes[weatherType] || this.wishWeatherTypes.sonnenbad;
+        const resultDiv = document.getElementById('wish-result');
+
+        // Show result div first to initialize map correctly
+        resultDiv.classList.remove('hidden');
+
+        try {
+          // 1. Geocoding for the City
+          const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=de&format=json`);
+          const geoData = await geoRes.json();
+          let lat = 52.52, lng = 13.40; // Default Berlin
+
+          if (geoData.results && geoData.results.length > 0) {
+            lat = geoData.results[0].latitude;
+            lng = geoData.results[0].longitude;
+            city = geoData.results[0].name;
+          }
+
+          // 2. Initialize/Update Map
+          if (this.wishMap) {
+            this.wishMap.remove();
+          }
+
+          this.wishMap = L.map('wish-map', {
+            center: [lat, lng],
+            zoom: 8,
+            minZoom: 6,
+            maxZoom: 8,
+            maxBounds: [[55.0, 5.5], [47.0, 15.5]],
+            maxBoundsViscosity: 1.0,
+            zoomControl: false,
+            scrollWheelZoom: false
+          });
+
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(this.wishMap);
+
+          const customIcon = L.divIcon({
+            html: `<div class="bg-white rounded-full shadow-lg p-2 border-2 border-[#003399] flex flex-col items-center justify-center" style="width: 60px; height: 60px;">
+                    <div class="text-2xl">${weather.icon}</div>
+                    <div class="text-[10px] font-bold text-[#003399]">${weather.temp}°</div>
+                   </div>`,
+            className: 'custom-wish-marker',
+            iconSize: [60, 60],
+            iconAnchor: [30, 30]
+          });
+
+          L.marker([lat, lng], { icon: customIcon }).addTo(this.wishMap);
+
+          // 3. Update Text Results
+          document.getElementById('wish-result-icon').innerText = weather.icon;
+          document.getElementById('wish-result-temp').innerText = weather.temp;
+          document.getElementById('wish-result-title').innerText = weather.title;
+          document.getElementById('wish-result-desc').innerText = weather.desc;
+          document.getElementById('wish-result-city').innerText = city;
+
+          const dateObj = new Date(date);
+          const formattedDate = dateObj.toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          document.getElementById('wish-result-date').innerText = formattedDate;
+
+          // 4. Generate Realistic Technical Details
+          const feelsLike = weather.temp + (Math.random() > 0.5 ? 2 : -2);
+          const wind = Math.floor(Math.random() * (weather.wind[1] - weather.wind[0])) + weather.wind[0];
+          const humidity = Math.floor(Math.random() * (weather.humidity[1] - weather.humidity[0])) + weather.humidity[0];
+          const pressure = Math.floor(Math.random() * (weather.pressure[1] - weather.pressure[0])) + weather.pressure[0];
+          const directions = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+          const windDir = directions[Math.floor(Math.random() * directions.length)];
+
+          document.getElementById('detail-feels-like').innerText = feelsLike;
+          document.getElementById('detail-wind').innerText = wind;
+          document.getElementById('detail-wind-dir').innerText = windDir;
+          document.getElementById('detail-humidity').innerText = humidity;
+          document.getElementById('detail-pressure').innerText = pressure;
+          document.getElementById('detail-visibility').innerText = weather.visibility;
+          document.getElementById('detail-uv').innerText = weather.uv;
+
+          // Seasonal Sun Times
+          const month = dateObj.getMonth();
+          let sunrise = "07:30", sunset = "17:30"; // Feb
+          if (month >= 3 && month <= 5) { sunrise = "05:30"; sunset = "21:00"; } // May
+          if (month >= 6 && month <= 8) { sunrise = "06:00"; sunset = "20:30"; } // Aug
+          if (month >= 9 && month <= 10) { sunrise = "07:30"; sunset = "16:30"; } // Nov
+
+          document.getElementById('detail-sunrise').innerText = sunrise + " Uhr";
+          document.getElementById('detail-sunset').innerText = sunset + " Uhr";
+
+          // 5. Shared Link
+          if (this.elements.shareLinkInput) {
+            this.elements.shareLinkInput.value = this.generateShareUrl(city, date, weatherType);
+          }
+
+          // 6. Animation
+          this.clearAnimations();
+          if (weather.animation !== 'none') {
+            this.triggerAnimation(weather.animation);
+          }
+
+          // 7. Final UX
+          resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        } catch (e) {
+          console.error("Fehler beim Erstellen des Wunsch-Wetters:", e);
+        }
+      }
+
+      generateShareUrl(city, date, weatherType) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        return `${baseUrl}?city=${encodeURIComponent(city)}&date=${date}&wetter=${weatherType}`;
+      }
+
+      copyToClipboard(text) {
+        if (!this.elements.copyLinkBtn) return;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalContent = this.elements.copyLinkBtn.innerHTML;
+          this.elements.copyLinkBtn.innerHTML = '<span>✓ Kopiert!</span>';
+          setTimeout(() => {
+            this.elements.copyLinkBtn.innerHTML = originalContent;
+          }, 2000);
+        });
+      }
+
+      triggerAnimation(type) {
+        this.elements.overlay.style.display = 'block';
+        this.elements.overlay.innerHTML = '';
+        if (type === 'sun') {
+          this.elements.overlay.className = 'sun-animation';
+          setTimeout(() => { this.elements.overlay.style.display = 'none'; }, 2500);
+        } else if (type === 'snow') {
+          for (let i = 0; i < 40; i++) {
+            const flake = document.createElement('div');
+            flake.className = 'snowflake';
+            flake.style.left = Math.random() * 100 + 'vw';
+            flake.style.animationDuration = Math.random() * 3 + 2 + 's';
+            flake.style.width = flake.style.height = Math.random() * 8 + 4 + 'px';
+            this.elements.overlay.appendChild(flake);
+          }
+          setTimeout(() => this.elements.overlay.style.display = 'none', 5000);
+        } else if (type === 'rain') {
+          for (let i = 0; i < 80; i++) {
+            const drop = document.createElement('div');
+            drop.className = 'raindrop';
+            drop.style.left = Math.random() * 100 + 'vw';
+            drop.style.animationDuration = Math.random() * 0.5 + 0.5 + 's';
+            this.elements.overlay.appendChild(drop);
+          }
+          setTimeout(() => this.elements.overlay.style.display = 'none', 5000);
+        } else if (type === 'storm') {
+          this.elements.overlay.className = 'storm-flash';
+          for (let i = 0; i < 100; i++) {
+            const drop = document.createElement('div');
+            drop.className = 'raindrop';
+            drop.style.left = Math.random() * 100 + 'vw';
+            drop.style.animationDuration = Math.random() * 0.4 + 0.3 + 's';
+            drop.style.opacity = '0.4';
+            this.elements.overlay.appendChild(drop);
+          }
+          setTimeout(() => this.elements.overlay.style.display = 'none', 6000);
+        }
+      }
+
+      clearAnimations() {
+        this.elements.overlay.style.display = 'none';
+        this.elements.overlay.innerHTML = '';
+        this.elements.overlay.className = '';
+      }
+
+      async fetchData(city, targetDate = null) {
+        this.clearAnimations();
+        this.elements.wishBadge.classList.add('hidden');
+        this.uiLoading(true);
+        try {
+          const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=de&format=json`);
+          const geoData = await geoRes.json();
+
+          if (!geoData.results || geoData.results.length === 0) throw new Error(`Ort nicht gefunden.`);
+
+          const location = geoData.results[0];
+          this.elements.cityDisplay.innerText = location.name;
+          this.elements.displayDate.innerText = "Aktuell";
+
+          const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
+          const weatherRes = await fetch(weatherUrl);
+          const weatherData = await weatherRes.json();
+
+          this.updateUI(weatherData, false);
+
+        } catch (error) {
+          this.uiError(error.message);
+        } finally {
+          this.uiLoading(false);
+        }
+      }
+
+
+
+      async loadMapData() {
+        // Initialize Leaflet Map centered on Germany with strict bounds
+        const map = L.map('weather-map', {
+          center: [51.1657, 10.4515],
+          zoom: 6,
+          minZoom: 6,
+          maxZoom: 8,
+          maxBounds: [[55.0, 5.5], [47.0, 15.5]],
+          maxBoundsViscosity: 1.0,
+          zoomControl: false, // Clean look without zoom controls
+          scrollWheelZoom: true
+        });
+
+        // Add OpenStreetMap tile layer (CartoDB Positron for clean look)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 8
+        }).addTo(map);
+
+        // City coordinates
+        const cities = {
+          'Hamburg': { lat: 53.5511, lng: 9.9937 },
+          'Berlin': { lat: 52.5200, lng: 13.4050 },
+          'Köln': { lat: 50.9375, lng: 6.9603 },
+          'München': { lat: 48.1351, lng: 11.5820 },
+          'Frankfurt am Main': { lat: 50.1109, lng: 8.6821 },
+          'Leipzig': { lat: 51.3397, lng: 12.3731 }
+        };
+
+        // Store map reference
+        this.map = map;
+        this.markers = {};
+
+        // Fetch weather for each city and create markers
+        for (const [cityName, coords] of Object.entries(cities)) {
+          try {
+            const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current_weather=true&daily=precipitation_probability_max&timezone=auto`);
+            const wData = await wRes.json();
+
+            const temp = Math.round(wData.current_weather.temperature);
+            const windspeed = wData.current_weather.windspeed;
+            const weathercode = wData.current_weather.weathercode;
+            const precipitation = wData.daily && wData.daily.precipitation_probability_max ? wData.daily.precipitation_probability_max[0] : 0;
+
+            const codeInfo = this.weatherCodes[weathercode] || { label: 'Unbekannt', icon: '🌤️' };
+
+            // Temperature color coding
+            let tempClass = 'temp-warm';
+            if (temp < 0) tempClass = 'temp-freezing';
+            else if (temp < 15) tempClass = 'temp-cold';
+            else if (temp > 25) tempClass = 'temp-hot';
+
+            // Create custom marker HTML
+            const markerHTML = `
+              <div class="weather-marker">
+                <div class="weather-marker-temp ${tempClass}">${temp}°</div>
+                <div class="weather-marker-icon">${codeInfo.icon}</div>
+                <div class="weather-marker-city">${cityName.split(' ')[0]}</div>
+              </div>
+            `;
+
+            const customIcon = L.divIcon({
+              html: markerHTML,
+              className: 'custom-weather-icon',
+              iconSize: [70, 90],
+              iconAnchor: [35, 45]
+            });
+
+            // Create marker
+            const marker = L.marker([coords.lat, coords.lng], { icon: customIcon }).addTo(map);
+
+            // Popup content
+            const popupContent = `
+              <div style="font-family: 'Inter', sans-serif; min-width: 180px;">
+                <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #1e293b;">${cityName}</h3>
+                <div style="font-size: 28px; font-weight: 700; color: ${tempClass === 'temp-hot' ? '#ef4444' : tempClass === 'temp-freezing' ? '#3b82f6' : tempClass === 'temp-cold' ? '#10b981' : '#f59e0b'}; margin-bottom: 8px;">${temp}°C</div>
+                <div style="font-size: 14px; color: #64748b; margin-bottom: 12px;">${codeInfo.label} ${codeInfo.icon}</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #475569;">
+                  <div>
+                    <div style="font-weight: 600; color: #94a3b8;">Wind</div>
+                    <div style="font-weight: 700;">${windspeed} km/h</div>
+                  </div>
+                  <div>
+                    <div style="font-weight: 600; color: #94a3b8;">Regen</div>
+                    <div style="font-weight: 700;">${precipitation}%</div>
+                  </div>
+                </div>
+                <button onclick="window.app.fetchData('${cityName}')" style="margin-top: 12px; width: 100%; background: #003399; color: white; font-weight: 600; padding: 8px; border-radius: 6px; border: none; cursor: pointer;">
+                  Details anzeigen
+                </button>
+              </div>
+            `;
+
+            marker.bindPopup(popupContent);
+
+            // Click handler to show details
+            marker.on('click', () => {
+              this.fetchData(cityName);
+            });
+
+            this.markers[cityName] = marker;
+
+          } catch (e) {
+            console.error(`Error loading weather for ${cityName}:`, e);
+          }
+        }
+      }
+
+      updateUI(data, isTargetDate) {
+        const current = data.current_weather;
+        this.renderForecast(data.daily);
+
+        this.elements.currentTemp.innerText = Math.round(current.temperature);
+        this.elements.windSpeed.innerText = current.windspeed;
+
+        const codeInfo = this.weatherCodes[current.weathercode] || { label: 'Unbekannt', icon: '🌤️' };
+        this.elements.weatherIconLg.innerText = codeInfo.icon;
+        this.elements.weatherDesc.innerText = codeInfo.label;
+        this.elements.precipProb.innerText = data.daily && data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[0] : 0;
+      }
+
+      renderForecast(daily) {
+        if (!daily) return;
+        this.elements.forecastContainer.innerHTML = '';
+        const count = Math.min(daily.time.length, 5);
+        for (let i = 0; i < count; i++) {
+          const dateObj = new Date(daily.time[i]);
+          const dayName = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
+          const maxTemp = Math.round(daily.temperature_2m_max[i]);
+          const code = daily.weathercode[i];
+          const icon = (this.weatherCodes[code] || { icon: '🌤️' }).icon;
+
+          const html = `
+                        <div class="bg-blue-50 p-2 rounded border border-blue-100 flex flex-col items-center justify-center hover:bg-white transition">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase">${dayName}</span>
+                            <span class="text-xl my-1">${icon}</span>
+                            <span class="font-bold text-slate-800 text-sm">${maxTemp}°</span>
+                        </div>
+                    `;
+          this.elements.forecastContainer.innerHTML += html;
+        }
+      }
+
+      uiLoading(isLoading) {
+        if (isLoading) {
+          this.elements.statusMessage.classList.add('hidden');
+          this.elements.currentTemp.innerText = "--";
+        }
+      }
+
+      uiError(message) {
+        this.elements.statusMessage.innerHTML = `⚠️ <span>${message}</span>`;
+        this.elements.statusMessage.className = "mb-6 p-4 rounded-lg text-center bg-red-100 text-red-700 border border-red-200 block";
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.app = new WeatherApp();
+    });
+  </script>
+</body>
+
+</html>
